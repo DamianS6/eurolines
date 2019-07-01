@@ -1,0 +1,19 @@
+<html>
+    <head>
+        <title>Search results</title>
+    </head>
+    <body>
+        <ul>
+            {% for day in connections %}
+                {% for journey in day %}
+            <li>
+                {{ journey.source }} ({{ journey.departure_datetime.replace('T', ' ') }})
+                -> {{ journey.destination }} ({{ journey.arrival_datetime.replace('T', ' ') }}) <br>
+                Free seats: {{ journey.free_seats }} <br>
+                Price: {{ journey.price }}
+            </li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+    </body>
+</html>

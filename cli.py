@@ -8,8 +8,5 @@ from connections import find_connection
 @click.option('--destination')
 @click.option('--departure_date')
 def cli(source, destination, departure_date):
-    find_connection(source, destination, departure_date)
-
-
-if __name__ == '__main__':
-    cli()
+    passengers = 1
+    find_connection(source, destination, passengers, departure_date)

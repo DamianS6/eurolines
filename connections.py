@@ -1,11 +1,49 @@
 from requests_html import HTMLSession
-from redis import StrictRedis
 from slugify import slugify
+from datetime import datetime, timedelta
+from cache import get_redis
 import json
 
 # TODO: Consider other stops (stops id, not first general city id)?
 
 # TODO: Write locations (key - source name, val - source code?) to redis
+
+# TODO: Correct this redis working to leave only pipeline. DONE??????
+
+# TODO: REDIS DOESN'T WORK! Correct source and destination so it everywhere takes the same (full slugified stop name)
+
+# TODO: Optional date_to.
+
+# TODO: Use autocomplete selector with cities from eurolines api??????????????????
+
+# TODO: Store cities list in redis and read from it
+
+# TODO: Use INNER JOIN to create combinations, implement API that return them
+
+# TODO: SQLAlchemy
+
+
+def cities_list():
+    redis = get_redis()
+    session = HTMLSession()
+    cities = []
+    for i in range(150):
+        r = session.get(f'https://back.eurolines.eu/euroline_api/countries/{i}/cities')
+        country_info = r.json()
+        print(country_info)
+        if r.json() is None:
+            continue
+        else:
+            for city in country_info:
+                cities.append(city['Name'])
+
+    for city in cities:
+        redis.setex(
+            city,
+            60*60,
+            json.dumps(city)
+        )
+    return cities
 
 
 def find_city_code(city_name):
@@ -14,12 +52,12 @@ def find_city_code(city_name):
     city_info = r.json()
     # print(city_info)
     # print(city_info[0]['stops'][0]['id']) # ??????????????????????????????????
-    # TODO
+    # TODO!
     try:
-        if len(city_info[0]['stops']) == 1:
+        #if len(city_info[0]['stops']) == 1:
             # print("Only one stop")
-            return city_info[0]['id']
-        else:
+            #return city_info[0]['id']
+        #else:
             # print("More stops")
             return city_info[0]['id']
     except IndexError:
@@ -55,34 +93,24 @@ def redis_write(source, destination, passengers, departure_date, carrier, redis)
                 'destination_ID': item['destination']['id'],
             })
 
-    redis.setex(
-        f'journey:{source}_{destination}_{departure_date}_{carrier}',
-        60*60,
-        json.dumps(itineraries)
-    )
-    return itineraries
+        return itineraries
 
 
 def redis_work(source, destination, passengers, departure_date, carrier):
-    source = slugify(source)
+    source = slugify(source, separator='_')
     destination = slugify(destination, separator='_')
-
-    redis_config = {
-        'host': '157.230.124.217',
-        'password': 'akd89DSk23Kldl0ram',
-        'port': 6379,
-    }
-    redis = StrictRedis(socket_connect_timeout=3, **redis_config)
+    # print(f'journey:{source}_{destination}_{departure_date}_{carrier}')
+    redis = get_redis()
     redis_info = redis.get(f'journey:{source}_{destination}_{departure_date}_{carrier}')
-
     if redis_info is None:
         return redis_write(source, destination, passengers, departure_date, carrier, redis)
     else:
         return json.loads(redis_info)
 
 
-def find_connection(source, destination, departure_date, passengers):
+def find_connection(source, destination, passengers, departure_date):
     """English names, date in format YYYY-MM-DD."""
+    print(departure_date)
     redis_result = redis_work(source, destination, passengers, departure_date, carrier='eurolines')
     redis_filtered = [x for x in redis_result if x['free_seats'] >= passengers]
     if not redis_filtered:
@@ -92,3 +120,27 @@ def find_connection(source, destination, departure_date, passengers):
     print(redis_filtered)
     return redis_filtered
 
+
+def find_all(source, destination, passengers, date_from, date_to):
+    print(date_to, date_from)
+    days_number = datetime.strptime(date_to, "%Y-%m-%d") - datetime.strptime(date_from, "%Y-%m-%d")
+    departure_date = datetime.strptime(date_from, "%Y-%m-%d").date()
+    connections = []
+    for i in range(days_number.days + 1):
+        connections.append(find_connection(source, destination, passengers, departure_date))
+        departure_date += timedelta(days=1)
+
+    redis = get_redis()
+    pipe = redis.pipeline()
+    for day in connections:
+        source = slugify(day[0]['source'], separator='_')
+        destination = slugify(day[0]['destination'], separator='_')
+        # print(f"journey:{source}_{destination}_{day[0]['departure_datetime'][:10]}_eurolines")
+        pipe.setex(
+            f"journey:{source}_{destination}_{day[0]['departure_datetime'][:10]}_eurolines",
+            60*60,
+            json.dumps(day)
+        )
+    pipe.execute()
+
+    return connections

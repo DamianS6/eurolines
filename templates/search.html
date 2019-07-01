@@ -1,0 +1,31 @@
+<html>
+    <head>
+        <title>Search Page</title>
+        <link rel="stylesheet" href="//code.jquery.com/ui/1.12.1/themes/base/jquery-ui.css">
+        <script src="https://code.jquery.com/jquery-1.12.4.js"></script>
+        <script src="https://code.jquery.com/ui/1.12.1/jquery-ui.js"></script>
+        <script>
+            $(function(){
+                $("#date_from").datepicker({dateFormat: "yy-mm-dd"});
+            });
+            $(function(){
+                $("#date_to").datepicker({dateFormat: "yy-mm-dd"});
+            });
+            $(function(){
+               $("#source").autocomplete({source: "/locations-search", minLength: 2});
+            });
+        </script>
+    </head>
+
+    <body>
+ 		<form action="{{ url_for('user_search') }}" method="post">
+            {{ form.source.label }}: {{ form.source(size=20) }} <br>
+            {{ form.destination.label }}: {{ form.destination(size=20) }} <br>
+            {{ form.passengers.label }}: {{ form.passengers(size=5) }} <br>
+            {{ form.date_from.label }}: {{ form.date_from }} <br>
+            {{ form.date_to.label }}: {{ form.date_to }}
+      		<input type="submit" value="Search">
+ 		</form>
+    </body>
+</html>
+
